@@ -2,14 +2,17 @@ import type { UsageRecord } from "../types.js";
 import { parseTime, threadToRecords, type Role, type ThreadMessage } from "./thread.js";
 
 /**
- * Export Grok (grok.com > Paramètres > Données > Exporter, fichier type `prod-grok-backend.json`).
+ * Lecteur tolérant pour les exports au format non documenté :
+ * - Grok (grok.com > Paramètres > Données > Exporter, `prod-grok-backend.json`) ;
+ * - Mistral Le Chat (outil d'export du compte Mistral).
  *
- * xAI ne documente pas ce format. Plutôt que de figer un schéma, on parcourt
+ * Plutôt que de figer un schéma, on parcourt
  * le JSON et on traite comme une conversation tout tableau dont les éléments
  * ressemblent à des messages : un rôle (`sender` | `role` | `author`) et un texte
  * (`message` | `content` | `text`), éventuellement enveloppés dans `response` ou `message`.
  */
 export const GROK_FALLBACK_MODEL = "grok (modèle inconnu)";
+export const MISTRAL_FALLBACK_MODEL = "mistral (modèle inconnu)";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -23,14 +26,21 @@ function normalizeRole(v: unknown): Role | undefined {
   return undefined;
 }
 
+/** Contenu sous forme de blocs, comme dans l'API Mistral : `[{ type: "text", text }]`. */
+function chunksText(v: unknown): string | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const parts = v.map((c) => (isObj(c) && typeof c.text === "string" ? c.text : undefined)).filter((t) => t !== undefined);
+  return parts.length > 0 ? parts.join("\n") : undefined;
+}
+
 function asMessage(item: unknown): ThreadMessage | undefined {
   if (!isObj(item)) return undefined;
   for (const candidate of [item, item.response, item.message]) {
     if (!isObj(candidate)) continue;
     const role = normalizeRole(candidate.sender ?? candidate.role ?? candidate.author);
-    const text = [candidate.message, candidate.content, candidate.text].find((t) => typeof t === "string") as
-      | string
-      | undefined;
+    const text = [candidate.message, candidate.content, candidate.text, chunksText(candidate.content)].find(
+      (t) => typeof t === "string",
+    ) as string | undefined;
     if (role && text !== undefined) {
       const model = [candidate.model, item.model].find((m) => typeof m === "string") as string | undefined;
       return {
@@ -58,8 +68,11 @@ function findThreads(node: unknown, out: ThreadMessage[][]) {
   }
 }
 
-export function importGrok(data: unknown): UsageRecord[] {
+export function importTolerant(data: unknown, provider: string, fallbackModel: string): UsageRecord[] {
   const threads: ThreadMessage[][] = [];
   findThreads(data, threads);
-  return threads.flatMap((t) => threadToRecords("grok", t, GROK_FALLBACK_MODEL));
+  return threads.flatMap((t) => threadToRecords(provider, t, fallbackModel));
 }
+
+export const importGrok = (data: unknown) => importTolerant(data, "grok", GROK_FALLBACK_MODEL);
+export const importMistral = (data: unknown) => importTolerant(data, "mistral", MISTRAL_FALLBACK_MODEL);

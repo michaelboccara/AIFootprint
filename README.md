@@ -8,7 +8,7 @@ de voiture essence et d'avion**, avec une fourchette basse – médiane – haut
 ```bash
 npm install
 # Comptes grand public : exports de conversations (.zip ou .json), traités en local
-npm start -- import chatgpt-export.zip claude-export.zip takeout.zip prod-grok-backend.json
+npm start -- import chatgpt-export.zip claude-export.zip takeout.zip prod-grok-backend.json mistral-export.zip
 # API : clés admin
 OPENAI_ADMIN_KEY=sk-admin-... ANTHROPIC_ADMIN_KEY=sk-ant-admin-... npm start -- api --days 30
 npm start -- import export.zip --days 90 --json   # filtre de période et sortie JSON
@@ -23,6 +23,10 @@ npm test
 | Claude.ai | Paramètres → Confidentialité → Exporter les données → `conversations.json` | Non : Sonnet supposé | Bonne : réflexion et pièces jointes comprises |
 | Gemini | Google Takeout → Mon activité → Applications Gemini, **format JSON** | Non | Moyenne : pas de regroupement en conversations, donc historique sous-estimé |
 | Grok | grok.com → Paramètres → Données → Exporter → `prod-grok-backend.json` | Parfois | À valider : format non documenté par xAI, lecture tolérante |
+| Mistral Le Chat | Outil d'export des données du compte Mistral (voir le centre d'aide) | Parfois | À valider : format non documenté, lecture tolérante |
+
+Pour Grok et Mistral, le fournisseur est reconnu au nom du fichier (`grok`, `mistral`, `lechat`).
+Si le fichier a été renommé, ajoutez `--provider grok` ou `--provider mistral`.
 
 Principe : chaque réponse du modèle relit tout l'historique de la conversation. Cet historique est
 compté en tokens d'entrée, la réponse en tokens de sortie. Les tokens sont estimés à environ

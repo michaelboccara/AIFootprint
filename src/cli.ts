@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { connectorsFromEnv } from "./connectors/index.js";
 import { computeReport, type Report } from "./footprint/compute.js";
-import { importFile } from "./importers/index.js";
+import { importFile, PROVIDERS, type Provider } from "./importers/index.js";
 import type { Range, UsageRecord } from "./types.js";
 
 const HELP = `Usage :
   aifootprint api    [--days N] [--json]          usage des API (clés admin)
-  aifootprint import <fichier...> [--days N] [--json]   exports de conversations
+  aifootprint import <fichier...> [--days N] [--json] [--provider P]   exports de conversations
 
 api — variables d'environnement (au moins une) :
   OPENAI_ADMIN_KEY      clé admin OpenAI (sk-admin-...)
@@ -17,17 +17,26 @@ import — fichiers .zip ou .json, traités en local :
   ChatGPT   Paramètres > Gestion des données > Exporter (conversations.json)
   Claude    Paramètres > Confidentialité > Exporter les données (conversations.json)
   Gemini    Google Takeout > Mon activité > Applications Gemini, format JSON
-  Grok      grok.com > Paramètres > Données > Exporter (prod-grok-backend.json)`;
+  Grok      grok.com > Paramètres > Données > Exporter (prod-grok-backend.json)
+  Mistral   Le Chat : outil d'export des données du compte Mistral
+
+  --provider chatgpt|claude|gemini|grok|mistral   impose le fournisseur (utile si le fichier a été renommé)`;
 
 function parseArgs(argv: string[]) {
   const [command = "api", ...rest] = argv[0]?.startsWith("-") ? ["api", ...argv] : argv;
   let days: number | undefined;
   let json = false;
+  let provider: Provider | undefined;
   const files: string[] = [];
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--days") days = Number(rest[++i]);
     else if (a === "--json") json = true;
+    else if (a === "--provider") {
+      const p = rest[++i] as Provider;
+      if (!PROVIDERS.includes(p)) throw new Error(`--provider doit valoir : ${PROVIDERS.join(", ")}`);
+      provider = p;
+    }
     else if (a === "--help" || a === "-h") {
       console.log(HELP);
       process.exit(0);
@@ -38,7 +47,7 @@ function parseArgs(argv: string[]) {
     process.exit(0);
   }
   if (days !== undefined && (!Number.isFinite(days) || days <= 0)) throw new Error("--days doit être un nombre positif");
-  return { command, days, json, files };
+  return { command, days, json, files, provider };
 }
 
 const fmt = (n: number) =>
@@ -81,13 +90,13 @@ async function fromApi(start: Date, end: Date): Promise<UsageRecord[]> {
   return records;
 }
 
-async function fromExports(files: string[], json: boolean): Promise<UsageRecord[]> {
+async function fromExports(files: string[], json: boolean, provider?: Provider): Promise<UsageRecord[]> {
   if (files.length === 0) throw new Error("Indiquez au moins un fichier d'export (voir --help).");
   const records: UsageRecord[] = [];
   let imported = 0;
   for (const f of files) {
     try {
-      for (const r of await importFile(f)) {
+      for (const r of await importFile(f, provider)) {
         if (!json) console.error(`✓ ${r.source} : ${r.provider}, ${r.records.length} réponses`);
         records.push(...r.records);
         imported++;
@@ -101,14 +110,14 @@ async function fromExports(files: string[], json: boolean): Promise<UsageRecord[
 }
 
 async function main() {
-  const { command, days, json, files } = parseArgs(process.argv.slice(2));
+  const { command, days, json, files, provider } = parseArgs(process.argv.slice(2));
   const end = new Date();
   const start = days ? new Date(end.getTime() - days * 86_400_000) : undefined;
 
   let records: UsageRecord[];
   if (command === "api") records = await fromApi(start ?? new Date(end.getTime() - 30 * 86_400_000), end);
   else if (command === "import") {
-    records = await fromExports(files, json);
+    records = await fromExports(files, json, provider);
     if (start) records = records.filter((r) => new Date(r.periodStart) >= start);
   } else throw new Error(`Commande inconnue : ${command}\n\n${HELP}`);
 

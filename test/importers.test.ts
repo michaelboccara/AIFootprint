@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { importChatGPT } from "../src/importers/chatgpt.js";
 import { CLAUDE_FALLBACK_MODEL, importClaude } from "../src/importers/claude.js";
 import { GEMINI_FALLBACK_MODEL, htmlToText, importGemini } from "../src/importers/gemini.js";
-import { importGrok } from "../src/importers/grok.js";
+import { importGrok, importMistral, MISTRAL_FALLBACK_MODEL } from "../src/importers/tolerant.js";
 import { importFile, importJson } from "../src/importers/index.js";
 import { estimateTokens, parseTime } from "../src/importers/thread.js";
 
@@ -134,10 +134,34 @@ describe("importGrok", () => {
   });
 });
 
+describe("importMistral", () => {
+  it("lit des messages au format de l'API Mistral, contenu en blocs compris", () => {
+    const records = importMistral([
+      {
+        id: "conv1",
+        messages: [
+          { role: "user", content: text(20), created_at: "2026-11-01T10:00:00Z" },
+          { role: "assistant", content: [{ type: "text", text: text(70) }], created_at: "2026-11-01T10:00:05Z" },
+          { role: "user", content: text(10), created_at: "2026-11-01T10:01:00Z" },
+          { role: "assistant", content: text(40), model: "mistral-medium-2508", created_at: "2026-11-01T10:01:05Z" },
+        ],
+      },
+    ]);
+    expect(records).toEqual([
+      expect.objectContaining({ provider: "mistral", model: MISTRAL_FALLBACK_MODEL, inputTokens: 20, outputTokens: 70 }),
+      expect.objectContaining({ model: "mistral-medium-2508", inputTokens: 100, outputTokens: 40 }),
+    ]);
+  });
+});
+
 describe("importJson / importFile", () => {
   it("détecte le format", () => {
     expect(importJson(chatgpt, "conversations.json").provider).toBe("chatgpt");
     expect(() => importJson({ foo: 1 }, "x.json")).toThrow("format non reconnu");
+    const mistral = [{ messages: [{ role: "user", content: "salut" }, { role: "assistant", content: "bonjour !" }] }];
+    expect(importJson(mistral, "lechat-export.json").provider).toBe("mistral");
+    expect(importJson(mistral, "export.json", "mistral").provider).toBe("mistral");
+    expect(() => importJson(mistral, "export.json")).toThrow("--provider");
   });
 
   it("lit un zip ChatGPT et un zip Takeout en ignorant les autres services", async () => {
@@ -158,5 +182,9 @@ describe("importJson / importFile", () => {
     const res = await importFile(takeout);
     expect(res).toHaveLength(1);
     expect(res[0].provider).toBe("gemini");
+
+    const mz = join(dir, "export.zip");
+    writeFileSync(mz, zipSync({ "data/chats.json": strToU8(JSON.stringify([{ messages: [{ role: "user", content: "a" }, { role: "assistant", content: "bcde" }] }])) }));
+    expect((await importFile(mz, "mistral"))[0].provider).toBe("mistral");
   });
 });
