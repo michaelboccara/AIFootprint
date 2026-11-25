@@ -1,0 +1,25 @@
+{
+  "name": "aifootprint",
+  "version": "0.1.0",
+  "description": "Convertit l'usage des API d'IA (tokens par modèle) en équivalent km de voiture essence / avion",
+  "type": "module",
+  "bin": {
+    "aifootprint": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.10",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.2"
+  }
+}
