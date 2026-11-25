@@ -34,7 +34,7 @@ export const CACHED_INPUT_TOKEN_RELATIVE_COST = 0.005;
 const PATTERNS: [RegExp, ModelClass][] = [
   [/\b(nano|mini|lite|small|tiny|flash-8b)\b|haiku|ministral/i, "small"],
   [/flash|sonnet|medium|gpt-3\.5|llama.*(8b|70b)/i, "medium"],
-  [/opus|gpt-4|gpt-5|\bo[134]\b|o[134]-|pro|large|ultra|405b/i, "large"],
+  [/opus|grok|gpt-4|gpt-5|\bo[134]\b|o[134]-|pro|large|ultra|405b/i, "large"],
 ];
 
 export const DEFAULT_CLASS: ModelClass = "medium";

@@ -7,12 +7,34 @@ de voiture essence et d'avion**, avec une fourchette basse – médiane – haut
 
 ```bash
 npm install
-OPENAI_ADMIN_KEY=sk-admin-... ANTHROPIC_ADMIN_KEY=sk-ant-admin-... npm start -- --days 30
-npm start -- --json        # sortie JSON
+# Comptes grand public : exports de conversations (.zip ou .json), traités en local
+npm start -- import chatgpt-export.zip claude-export.zip takeout.zip prod-grok-backend.json
+# API : clés admin
+OPENAI_ADMIN_KEY=sk-admin-... ANTHROPIC_ADMIN_KEY=sk-ant-admin-... npm start -- api --days 30
+npm start -- import export.zip --days 90 --json   # filtre de période et sortie JSON
 npm test
 ```
 
-## Sources de données
+## Exports de conversations (comptes gratuits et payants)
+
+| Service | Où l'obtenir | Modèle connu ? | Fiabilité |
+|---|---|---|---|
+| ChatGPT | Paramètres → Gestion des données → Exporter → `conversations.json` | Oui, par message | Bonne : arbre complet, réponses régénérées comprises |
+| Claude.ai | Paramètres → Confidentialité → Exporter les données → `conversations.json` | Non : Sonnet supposé | Bonne : réflexion et pièces jointes comprises |
+| Gemini | Google Takeout → Mon activité → Applications Gemini, **format JSON** | Non | Moyenne : pas de regroupement en conversations, donc historique sous-estimé |
+| Grok | grok.com → Paramètres → Données → Exporter → `prod-grok-backend.json` | Parfois | À valider : format non documenté par xAI, lecture tolérante |
+
+Principe : chaque réponse du modèle relit tout l'historique de la conversation. Cet historique est
+compté en tokens d'entrée, la réponse en tokens de sortie. Les tokens sont estimés à environ
+4 caractères par token, sans tokenizer.
+
+Limites connues, qui vont toutes dans le sens d'une **sous-estimation** :
+- la réflexion cachée des modèles de raisonnement (o3, GPT-5 Thinking…) n'apparaît pas dans les exports,
+  seul son résumé y figure ;
+- les images, l'audio et la vidéo générés ne sont pas encore comptés ;
+- pour Gemini, l'historique relu à chaque tour n'est pas connu.
+
+## Sources de données API
 
 | Fournisseur | Endpoint (lecture seule) | Type de clé |
 |---|---|---|
@@ -60,6 +82,6 @@ km voiture    = CO₂e / g par km
 ## Feuille de route
 
 1. Connecteurs Google Vertex AI, Azure OpenAI et AWS Bedrock (OAuth ou IAM en lecture seule).
-2. Import des exports RGPD (ChatGPT, Claude.ai, Google Takeout) pour les comptes grand public.
+2. Comptage des images et vidéos générées ; estimation de la réflexion cachée des modèles de raisonnement.
 3. Intégration d'EcoLogits et de l'intensité carbone par région de datacenter.
 4. Interface web et suivi dans le temps.
